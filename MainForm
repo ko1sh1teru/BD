@@ -1,0 +1,187 @@
+using System;
+using System.Configuration;
+using System.Data;
+using System.Windows.Forms;
+using MySql.Data.MySqlClient;
+
+namespace BankApp
+{
+    public partial class MainForm : Form
+    {
+        private MySqlConnection connection;
+        private string server = ConfigurationManager.AppSettings["Server"];
+        private string port = ConfigurationManager.AppSettings["Port"];
+        private string database = ConfigurationManager.AppSettings["Database"];
+        private string username = ConfigurationManager.AppSettings["Uid"];
+        private string password = ConfigurationManager.AppSettings["Pwd"];
+        private bool isAuthenticated = false;
+        private int loggedInUserID;
+        CreateContractForm createContractForm = null;
+
+        public MainForm()
+        {
+            InitializeComponent();
+        }
+
+        private void MainForm_Load(object sender, EventArgs e)
+        {
+            string connectionString = $"Server={server};Port={port};Uid={username};Pwd={password};Database={database};";
+            connection = new MySqlConnection(connectionString);
+            createContractForm = new CreateContractForm(connection);
+            createContractForm.ContractCreated += CreateContractForm_ContractCreated;
+        }
+
+        private void CreateContractForm_ContractCreated(object sender, EventArgs e)
+        {
+            LoadContracts();
+        }
+
+        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (connection.State == ConnectionState.Open)
+            {
+                connection.Close();
+            }
+        }
+
+        private void btnConnect_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                connection.Open();
+                LoadContracts();
+                MessageBox.Show("Connected to MySQL database!");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error connecting to MySQL database: {ex.Message}");
+            }
+        }
+
+        private void LoadContracts()
+        {
+            string query = "SELECT * FROM contract";
+
+            try
+            {
+                MySqlCommand command = new MySqlCommand(query, connection);
+                MySqlDataAdapter adapter = new MySqlDataAdapter(command);
+                DataTable dataTable = new DataTable();
+                adapter.Fill(dataTable);
+
+                dgvContracts.DataSource = dataTable;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading contracts: {ex.Message}");
+            }
+        }
+
+        private void btnDisconnect_Click(object sender, EventArgs e)
+        {
+            if (connection.State == ConnectionState.Open)
+            {
+                connection.Close();
+                MessageBox.Show("Disconnected from MySQL database!");
+            }
+            else
+            {
+                MessageBox.Show("No active connection to MySQL database!");
+            }
+        }
+
+        private void btnLogin_Click(object sender, EventArgs e)
+        {
+            string username = txtUsername.Text;
+            string password = txtPassword.Text;
+
+            string query = $"SELECT bk_ID FROM banker WHERE bk_FirstName = '{username}' AND bk_Password = '{password}'";
+
+            try
+            {
+                MySqlCommand command = new MySqlCommand(query, connection);
+                object result = command.ExecuteScalar();
+
+                if (result != null)
+                {
+                    isAuthenticated = true;
+                    loggedInUserID = Convert.ToInt32(result);
+                    MessageBox.Show("Login successful!");
+                }
+                else
+                {
+                    MessageBox.Show("Invalid username or password!");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error executing login query: {ex.Message}");
+            }
+        }
+
+        private void btnLogout_Click(object sender, EventArgs e)
+        {
+            if (isAuthenticated)
+            {
+                isAuthenticated = false;
+                loggedInUserID = 0;
+                MessageBox.Show("Logged out successfully!");
+            }
+        }
+
+        private void btnCreateContract_Click(object sender, EventArgs e)
+        {
+            if (isAuthenticated && connection.State == ConnectionState.Open)
+            {
+                createContractForm.ShowDialog();
+            }
+            else
+            {
+                MessageBox.Show("No active connection to MySQL database or login!");
+            }
+        }
+
+        private void btnDeleteContract_Click(object sender, EventArgs e)
+        {
+            if (dgvContracts.SelectedRows.Count > 0 && isAuthenticated)
+            {
+                int contractId = Convert.ToInt32(dgvContracts.SelectedRows[0].Cells["ckt_ID"].Value);
+
+                string query = $"DELETE FROM contract WHERE ckt_ID = {contractId}";
+
+                try
+                {
+                    using (MySqlCommand command = new MySqlCommand(query, connection))
+                    {
+                        int rowsAffected = command.ExecuteNonQuery();
+
+                        if (rowsAffected > 0)
+                        {
+                            MessageBox.Show("Contract deleted successfully!");
+
+                            LoadContracts();
+                        }
+                        else
+                        {
+                            MessageBox.Show("Failed to delete contract!");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error deleting contract: {ex.Message}");
+                }
+            }
+            else
+            {
+                MessageBox.Show("No row selected.");
+            }
+        }
+
+        private void txtUsername_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+    }
+}
+
