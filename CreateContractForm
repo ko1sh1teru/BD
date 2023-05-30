@@ -1,0 +1,60 @@
+using MySql.Data.MySqlClient;
+using System;
+using System.Windows.Forms;
+
+namespace BankApp
+{
+    public partial class CreateContractForm : Form
+    {
+        MySqlConnection connection = null;
+        public event EventHandler ContractCreated;
+
+        public CreateContractForm(MySqlConnection connection)
+        {
+            InitializeComponent();
+            this.connection = connection;
+        }
+
+        private void btnCreate_Click(object sender, EventArgs e)
+        {
+            int clientId = int.Parse(txtClientId.Text);
+            int bankerId = int.Parse(txtBankerId.Text);
+            int contributionId = int.Parse(txtContributionId.Text);
+            decimal balance = decimal.Parse(txtBalance.Text);
+            DateTime dateOfDiscovery = dtpDateOfDiscovery.Value;
+            DateTime closingDate = dtpClosingDate.Value;
+
+            string query = $"INSERT INTO contract (cl_ID, bk_ID, contr_ID, ckt_balance, ckt_DateOfDiscovery, ckt_СlosingDate) " +
+                           $"VALUES ({clientId}, {bankerId}, {contributionId}, {balance}, '{dateOfDiscovery.ToString("yyyy-MM-dd")}', '{closingDate.ToString("yyyy-MM-dd")}')";
+
+            try
+            {
+                using (MySqlCommand command = new MySqlCommand(query, connection))
+                {
+                    int rowsAffected = command.ExecuteNonQuery();
+
+                    if (rowsAffected > 0)
+                    {
+                        MessageBox.Show("Contract created successfully!");
+                    }
+                    else
+                    {
+                        MessageBox.Show("Failed to create contract!");
+                    }
+                }
+                OnContractCreated();
+                this.Close();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error creating contract: {ex.Message}");
+            }
+        }
+
+        protected virtual void OnContractCreated()
+        {
+            ContractCreated?.Invoke(this, EventArgs.Empty);
+        }
+
+    }
+}
